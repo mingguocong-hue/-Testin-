@@ -4,6 +4,7 @@ app.py — 合并版：候选人投递 + HR 管理后台
 """
 
 import os
+import zipfile
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
@@ -221,6 +222,7 @@ def _show_admin():
     st.caption(f"当前共有 **{len(candidates)}** 位候选人  ·  数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     tab1, tab2, tab3 = st.tabs(["🔁 重复投递记录", "🎯 JD 综合评分", "📤 导出 Excel"])
 
+    # ── Tab1：重复投递记录 ────────────────────────────────────────────────
     with tab1:
         st.subheader("重复投递记录")
         duplicates = [c for c in candidates if c.get("submission_history")]
@@ -236,28 +238,29 @@ def _show_admin():
                     for h in reversed(history):
                         rows.append({"投递时间": h.get("timestamp","未知"), "版本":"历史",
                                      "简历文件": h.get("resume_file_path",""), "作品集文件": h.get("portfolio_file_path","")})
-                    c1h,c2h,c3h,c4h = st.columns([2,1,3,3])
+                    c1h, c2h, c3h, c4h = st.columns([2,1,3,3])
                     c1h.markdown("**投递时间**"); c2h.markdown("**版本**")
                     c3h.markdown("**简历文件**"); c4h.markdown("**作品集**")
                     st.divider()
                     for row in rows:
-                        c1,c2,c3,c4 = st.columns([2,1,3,3])
+                        c1, c2, c3, c4 = st.columns([2,1,3,3])
                         c1.write(row["投递时间"]); c2.write(row["版本"])
                         rp = Path(row["简历文件"]) if row["简历文件"] else None
                         if rp and rp.exists():
-                            with open(rp,"rb") as f:
+                            with open(rp, "rb") as f:
                                 c3.download_button(f"📄 {rp.name}", f, file_name=rp.name,
                                                    key=f"dl_r_{cname}_{row['投递时间']}")
                         else:
                             c3.write("—")
                         pp = Path(row["作品集文件"]) if row["作品集文件"] else None
                         if pp and pp.exists():
-                            with open(pp,"rb") as f:
+                            with open(pp, "rb") as f:
                                 c4.download_button(f"📦 {pp.name}", f, file_name=pp.name,
                                                    key=f"dl_p_{cname}_{row['投递时间']}")
                         else:
                             c4.write("—")
 
+    # ── Tab2：JD 综合评分 ─────────────────────────────────────────────────
     with tab2:
         st.subheader("JD 综合评分汇总")
         st.caption("评分由 AI 根据简历全文自动打出，满分 100 分。")
@@ -293,11 +296,12 @@ def _show_admin():
                         mmax = dd.get("max")   or profile.get(dk,{}).get("max", 10)
                         s    = dd.get("score", 0)
                         cols[i].metric(lbl, f"{s}/{mmax}",
-                                       delta=f"{s-mmax//2:+d}" if isinstance(s,int) else None)
+                                       delta=f"{s-mmax//2:+d}" if isinstance(s, int) else None)
                         if dd.get("reason"): cols[i].caption(dd["reason"])
             st.divider()
 
-   with tab3:
+    # ── Tab3：导出 Excel / ZIP ────────────────────────────────────────────
+    with tab3:
         st.subheader("导出候选人数据")
 
         col_desc1, col_desc2 = st.columns(2)
@@ -317,24 +321,21 @@ def _show_admin():
         st.divider()
         btn_col1, btn_col2 = st.columns(2)
 
-        # ── 按钮1：打包 ZIP ───────────────────────────────────────────────
+        # 按钮1：打包 ZIP
         with btn_col1:
             if st.button("📦 生成 ZIP 打包文件", use_container_width=True, type="primary"):
-                import zipfile
-                from io import BytesIO as _BytesIO
-
                 with st.spinner("正在打包，请稍候（文件较多时需要一点时间）…"):
                     # 先生成 Excel（_write_file_cell 会写相对路径超链接）
                     save_to_excel(candidates, EXPORT_PATH)
 
-                    zip_buf = _BytesIO()
+                    zip_buf = BytesIO()
                     missing_files = []
 
                     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
                         # 放入 Excel
                         zf.write(EXPORT_PATH, arcname="candidates_export.xlsx")
 
-                        # 放入每位候选人的简历和作品集（含历史投递版本）
+                        # 放入每位候选人的简历和作品集（含历史版本）
                         for c in candidates:
                             for fpath_key in ("resume_file_path", "portfolio_file_path"):
                                 fpath = c.get(fpath_key, "")
@@ -400,7 +401,7 @@ def _show_admin():
                     "请确保 Excel 文件和 files 文件夹保持在同一目录下。"
                 )
 
-        # ── 按钮2：仅下载 Excel ───────────────────────────────────────────
+        # 按钮2：仅下载 Excel
         with btn_col2:
             if st.button("📥 仅下载 Excel 表格", use_container_width=True):
                 with st.spinner("正在生成 Excel…"):
