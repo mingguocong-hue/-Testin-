@@ -297,18 +297,124 @@ def _show_admin():
                         if dd.get("reason"): cols[i].caption(dd["reason"])
             st.divider()
 
-    with tab3:
-        st.subheader("导出候选人数据到 Excel")
-        st.markdown("导出内容包含两个工作表：**候选人信息** 和 **重复投递记录**。")
-        if st.button("📥 生成并下载 Excel", use_container_width=True):
-            with st.spinner("正在生成 Excel 文件…"):
-                save_to_excel(candidates, EXPORT_PATH)
-            with open(EXPORT_PATH,"rb") as f:
-                st.download_button("⬇️ 点击下载 candidates_export.xlsx", f,
-                                   file_name="candidates_export.xlsx",
-                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                   use_container_width=True)
-            st.success(f"Excel 已生成，共 {len(candidates)} 条记录。")
+   with tab3:
+        st.subheader("导出候选人数据")
+
+        col_desc1, col_desc2 = st.columns(2)
+        with col_desc1:
+            st.info(
+                "**📦 打包下载 ZIP（推荐）**\n\n"
+                "包含 Excel 表格 + 所有简历/作品集原文件。\n"
+                "解压后直接在 Excel 里点击文件名即可打开对应文件。"
+            )
+        with col_desc2:
+            st.info(
+                "**📥 仅下载 Excel**\n\n"
+                "只下载候选人信息表格。\n"
+                "文件列显示文件名但无法点击打开（文件留在服务器）。"
+            )
+
+        st.divider()
+        btn_col1, btn_col2 = st.columns(2)
+
+        # ── 按钮1：打包 ZIP ───────────────────────────────────────────────
+        with btn_col1:
+            if st.button("📦 生成 ZIP 打包文件", use_container_width=True, type="primary"):
+                import zipfile
+                from io import BytesIO as _BytesIO
+
+                with st.spinner("正在打包，请稍候（文件较多时需要一点时间）…"):
+                    # 先生成 Excel（_write_file_cell 会写相对路径超链接）
+                    save_to_excel(candidates, EXPORT_PATH)
+
+                    zip_buf = _BytesIO()
+                    missing_files = []
+
+                    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                        # 放入 Excel
+                        zf.write(EXPORT_PATH, arcname="candidates_export.xlsx")
+
+                        # 放入每位候选人的简历和作品集（含历史投递版本）
+                        for c in candidates:
+                            for fpath_key in ("resume_file_path", "portfolio_file_path"):
+                                fpath = c.get(fpath_key, "")
+                                if not fpath:
+                                    continue
+                                p = Path(fpath)
+                                if not p.exists():
+                                    missing_files.append(p.name)
+                                    continue
+                                try:
+                                    parts = p.parts
+                                    if "file_library" in parts:
+                                        idx = parts.index("file_library")
+                                        arcname = "files/" + "/".join(parts[idx + 1:])
+                                    else:
+                                        arcname = f"files/{p.parent.parent.name}/{p.parent.name}/{p.name}"
+                                except Exception:
+                                    arcname = f"files/{p.name}"
+                                zf.write(p, arcname=arcname)
+
+                            for h in c.get("submission_history", []):
+                                for hkey in ("resume_file_path", "portfolio_file_path"):
+                                    hpath = h.get(hkey, "")
+                                    if not hpath:
+                                        continue
+                                    hp = Path(hpath)
+                                    if not hp.exists():
+                                        missing_files.append(hp.name)
+                                        continue
+                                    try:
+                                        parts = hp.parts
+                                        if "file_library" in parts:
+                                            idx = parts.index("file_library")
+                                            arcname = "files/" + "/".join(parts[idx + 1:])
+                                        else:
+                                            arcname = f"files/{hp.parent.parent.name}/{hp.parent.name}/{hp.name}"
+                                    except Exception:
+                                        arcname = f"files/{hp.name}"
+                                    zf.write(hp, arcname=arcname)
+
+                    zip_buf.seek(0)
+
+                ts_str = datetime.now().strftime("%Y%m%d_%H%M")
+                st.download_button(
+                    label="⬇️ 点击下载 ZIP 压缩包",
+                    data=zip_buf.getvalue(),
+                    file_name=f"candidates_{ts_str}.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                )
+                st.success(f"✅ 打包完成！共 {len(candidates)} 位候选人数据已打包。")
+
+                if missing_files:
+                    st.warning(
+                        f"⚠️ 以下 {len(missing_files)} 个文件在服务器上已找不到，未能打入 ZIP：\n"
+                        + "\n".join(f"- {f}" for f in missing_files[:10])
+                        + ("\n- …（更多）" if len(missing_files) > 10 else "")
+                    )
+
+                st.caption(
+                    "💡 使用提示：解压 ZIP 后，用 Excel 打开 candidates_export.xlsx，"
+                    "点击简历/作品集列中蓝色文件名即可直接打开对应文件。"
+                    "请确保 Excel 文件和 files 文件夹保持在同一目录下。"
+                )
+
+        # ── 按钮2：仅下载 Excel ───────────────────────────────────────────
+        with btn_col2:
+            if st.button("📥 仅下载 Excel 表格", use_container_width=True):
+                with st.spinner("正在生成 Excel…"):
+                    save_to_excel(candidates, EXPORT_PATH)
+                with open(EXPORT_PATH, "rb") as f:
+                    st.download_button(
+                        label="⬇️ 点击下载 candidates_export.xlsx",
+                        data=f,
+                        file_name="candidates_export.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+                st.success(f"Excel 已生成，共 {len(candidates)} 条记录。")
+                st.caption("注意：仅下载表格时文件列无法点击。如需打开文件请使用左侧 ZIP 打包下载。")
 
 
 # ── 路由 ──────────────────────────────────────────────────────────────────
