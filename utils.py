@@ -43,6 +43,54 @@ try:
 except ImportError:
     _PDF_OK = False
 
+
+# ────────────────────────────────────────────────────────────────────────────
+# candidates.json 加密存储工具
+# 使用 Fernet 对称加密（AES-128-CBC），密钥存在 .recruit_key 文件
+# ────────────────────────────────────────────────────────────────────────────
+try:
+    from cryptography.fernet import Fernet as _Fernet
+    _CRYPTO_OK = True
+except ImportError:
+    _CRYPTO_OK = False
+
+def _get_fernet(base_dir: Path):
+    """获取或创建加密密钥，返回 Fernet 实例（或 None 表示不加密）。"""
+    if not _CRYPTO_OK:
+        return None
+    key_path = base_dir / ".recruit_key"
+    if key_path.exists():
+        key = key_path.read_bytes()
+    else:
+        key = _Fernet.generate_key()
+        key_path.write_bytes(key)
+        key_path.chmod(0o600)   # 仅文件拥有者可读
+    return _Fernet(key)
+
+def load_candidates(candidates_path: Path) -> list:
+    """读取 candidates.json，自动解密（如果已加密）。"""
+    if not candidates_path.exists():
+        return []
+    try:
+        raw = candidates_path.read_bytes()
+        fernet = _get_fernet(candidates_path.parent)
+        if fernet:
+            try:
+                raw = fernet.decrypt(raw)
+            except Exception:
+                pass  # 可能是尚未加密的旧文件，直接当明文处理
+        return json.loads(raw.decode("utf-8"))
+    except (json.JSONDecodeError, Exception):
+        return []
+
+def save_candidates(candidates: list, candidates_path: Path):
+    """保存 candidates.json，自动加密。"""
+    raw = json.dumps(candidates, ensure_ascii=False, indent=2).encode("utf-8")
+    fernet = _get_fernet(candidates_path.parent)
+    if fernet:
+        raw = fernet.encrypt(raw)
+    candidates_path.write_bytes(raw)
+
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
