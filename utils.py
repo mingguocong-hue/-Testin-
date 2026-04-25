@@ -1066,18 +1066,16 @@ def _file_uri(fpath: str) -> str:
 
 
 def _write_file_cell(cell, fpath: str, bold: bool = False) -> None:
+    """显示文件名（纯文本，不加超链接）。
+    文件下载请至 admin 管理后台操作，超链接在跨机器/云部署时无法使用。
+    """
     if not fpath:
-        cell.value = ""
+        cell.value = "—"
+        cell.font = Font(name="Arial", size=10, bold=bold, color="888888")
         return
-    uri = _file_uri(fpath)
-    cell.value = Path(fpath).name
-    if uri:
-        cell.hyperlink = uri
-    cell.font = Font(
-        name="Arial", size=10, bold=bold,
-        color="0563C1" if uri else "000000",
-        underline="single" if uri else None,
-    )
+    fname = Path(fpath).name
+    cell.value = fname
+    cell.font = Font(name="Arial", size=10, bold=bold, color="1A1A2E")
 
 
 def save_to_excel(candidates: list, path) -> None:
