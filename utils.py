@@ -1054,28 +1054,53 @@ def _auto_width(ws, headers: list, max_width: int = 45) -> None:
 
 
 def _file_uri(fpath: str) -> str:
+    """
+    云端部署下不使用 file:// 绝对路径（对 HR 本地无效）。
+    改为返回相对路径字符串，供 _write_file_cell 写入 Excel 超链接。
+    ZIP 解压后 Excel 和 files/ 文件夹同级，相对路径即可跳转。
+    """
     if not fpath:
         return ""
     p = Path(fpath)
     if not p.exists():
         return ""
     try:
-        return p.resolve().as_uri()
+        parts = p.parts
+        if "file_library" in parts:
+            idx = parts.index("file_library")
+            rel = "/".join(parts[idx + 1:])
+            return f"files/{rel}"
+        return f"files/{p.parent.parent.name}/{p.parent.name}/{p.name}"
     except Exception:
-        return ""
+        return f"files/{p.name}"
 
 
 def _write_file_cell(cell, fpath: str, bold: bool = False) -> None:
-    """显示文件名（纯文本，不加超链接）。
-    文件下载请至 admin 管理后台操作，超链接在跨机器/云部署时无法使用。
+    """
+    写入文件列单元格。
+    - 文件存在：写相对路径超链接（蓝色下划线），ZIP 解压后可点击打开
+    - 文件不存在：显示灰色"—"
     """
     if not fpath:
         cell.value = "—"
-        cell.font = Font(name="Arial", size=10, bold=bold, color="888888")
+        cell.font = Font(name="Arial", size=10, bold=bold, color="AAAAAA")
         return
-    fname = Path(fpath).name
-    cell.value = fname
-    cell.font = Font(name="Arial", size=10, bold=bold, color="1A1A2E")
+
+    p = Path(fpath)
+    fname = p.name
+    rel_uri = _file_uri(fpath)
+
+    if rel_uri and p.exists():
+        cell.value = fname
+        cell.hyperlink = rel_uri          # 相对路径超链接，解压后有效
+        cell.font = Font(
+            name="Arial", size=10, bold=bold,
+            color="0563C1",               # Excel 标准超链接蓝色
+            underline="single",
+        )
+    else:
+        cell.value = fname if fpath else "—"
+        cell.font = Font(name="Arial", size=10, bold=bold, color="AAAAAA")
 
 
 def save_to_excel(candidates: list, path) -> None:
