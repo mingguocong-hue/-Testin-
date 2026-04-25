@@ -121,7 +121,7 @@ def _show_candidate():
             target_position = st.selectbox(
                 "意向岗位", ["管培生", "运营岗位", "AI测试员", "后台技术管理员", "其他"]
             )
-        strengths      = st.text_area("3~5 个优势/特点（每行一个）", height=100)
+        strengths      = st.text_area("3~5 个优势/特点", height=100)
         resume_file    = st.file_uploader("上传简历 TXT / DOCX / PDF *", type=["txt","docx","pdf"])
         portfolio_file = st.file_uploader("上传个人作品集（可选）", type=["pdf","docx","zip"])
         submitted = st.form_submit_button("🚀 提交", use_container_width=True)
