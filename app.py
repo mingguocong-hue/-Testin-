@@ -121,8 +121,8 @@ def _show_candidate():
             target_position = st.selectbox(
                 "意向岗位", ["管培生", "运营岗位", "AI测试员", "后台技术管理员", "其他"]
             )
-        strengths      = st.text_area("3~5 个优势/特点", height=100)
-        resume_file    = st.file_uploader("上传简历 TXT / DOCX / PDF *", type=["txt","docx","pdf"])
+        strengths      = st.text_area("3~5 个优势/特点（每行一个）", height=100)
+        resume_file    = st.file_uploader("上传简历 TXT / DOC / DOCX / PDF *", type=["txt","doc","docx","pdf"])
         portfolio_file = st.file_uploader("上传个人作品集（可选）", type=["pdf","docx","zip"])
         submitted = st.form_submit_button("🚀 提交", use_container_width=True)
 
@@ -165,11 +165,8 @@ def _show_candidate():
 
         mismatches = []
         if resume_text:
-            ai_name  = (parsed_data.get("name")  or "").strip()
             ai_phone = (parsed_data.get("phone") or "").strip()
             ai_email = (parsed_data.get("email") or "").strip()
-            if ai_name  and ai_name  != name.strip():
-                mismatches.append(f"**姓名**：您填写「{name.strip()}」，简历中识别到「{ai_name}」")
             if ai_phone and ai_phone != phone.strip():
                 mismatches.append(f"**电话**：您填写「{phone.strip()}」，简历中识别到「{ai_phone}」")
             if ai_email and ai_email != email.strip():
